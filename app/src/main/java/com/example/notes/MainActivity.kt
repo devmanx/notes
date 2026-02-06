@@ -16,13 +16,15 @@ import com.example.notes.ui.NotesScreen
 import com.example.notes.ui.NotesViewModel
 
 class MainActivity : ComponentActivity() {
+    private val notesDirectoryProvider = NotesDirectoryProvider(this)
     private val viewModel: NotesViewModel by viewModels {
         NotesViewModelFactory(
-            repository = FileNotesRepository(NotesDirectoryProvider(this)),
+            repository = FileNotesRepository(notesDirectoryProvider),
             backupManager = EncryptedBackupManager(
-                notesDirectory = NotesDirectoryProvider(this).notesDirectory(),
+                notesDirectoryProvider = notesDirectoryProvider,
                 backupStorage = GoogleDriveBackupStorage(PlaceholderDriveUploader())
-            )
+            ),
+            notesDirectoryProvider = notesDirectoryProvider
         )
     }
 
@@ -38,7 +40,8 @@ class MainActivity : ComponentActivity() {
                 onSaveNote = viewModel::saveNote,
                 onDeleteNote = viewModel::deleteSelectedNote,
                 onSelectLabel = viewModel::selectLabel,
-                onCloseEditor = viewModel::closeEditor
+                onCloseEditor = viewModel::closeEditor,
+                onUpdateNotesDirectory = viewModel::updateNotesDirectory
             )
         }
     }
@@ -46,12 +49,13 @@ class MainActivity : ComponentActivity() {
 
 private class NotesViewModelFactory(
     private val repository: FileNotesRepository,
-    private val backupManager: EncryptedBackupManager
+    private val backupManager: EncryptedBackupManager,
+    private val notesDirectoryProvider: NotesDirectoryProvider
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(NotesViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return NotesViewModel(repository, backupManager) as T
+            return NotesViewModel(repository, backupManager, notesDirectoryProvider) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }
