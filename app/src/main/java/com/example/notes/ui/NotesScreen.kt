@@ -11,8 +11,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -37,8 +42,20 @@ fun NotesScreen(
     onSaveNote: (String, String, List<String>) -> Unit,
     onDeleteNote: () -> Unit,
     onSelectLabel: (String?) -> Unit,
-    onCloseEditor: () -> Unit
+    onCloseEditor: () -> Unit,
+    onUpdateNotesDirectory: (String) -> Unit
 ) {
+    var isSettingsOpen by remember { mutableStateOf(false) }
+    var directoryInput by remember(state.notesDirectoryPath) {
+        mutableStateOf(state.notesDirectoryPath)
+    }
+
+    LaunchedEffect(state.notesDirectoryPath) {
+        if (!isSettingsOpen) {
+            directoryInput = state.notesDirectoryPath
+        }
+    }
+
     Surface(modifier = Modifier.fillMaxSize()) {
         if (state.isEditing) {
             NoteEditorScreen(
@@ -52,9 +69,42 @@ fun NotesScreen(
                 notes = state.notes,
                 labels = state.labels,
                 selectedLabel = state.selectedLabel,
+                notesDirectoryPath = state.notesDirectoryPath,
                 onStartCreate = onStartCreate,
                 onOpenNote = onOpenNote,
-                onSelectLabel = onSelectLabel
+                onSelectLabel = onSelectLabel,
+                onOpenSettings = { isSettingsOpen = true }
+            )
+        }
+
+        if (isSettingsOpen) {
+            AlertDialog(
+                onDismissRequest = { isSettingsOpen = false },
+                title = { Text("Ustawienia katalogu") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Wskaż katalog na notatki:")
+                        OutlinedTextField(
+                            value = directoryInput,
+                            onValueChange = { directoryInput = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("Ścieżka do katalogu") }
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(onClick = {
+                        onUpdateNotesDirectory(directoryInput.trim())
+                        isSettingsOpen = false
+                    }) {
+                        Text("Zapisz")
+                    }
+                },
+                dismissButton = {
+                    Button(onClick = { isSettingsOpen = false }) {
+                        Text("Anuluj")
+                    }
+                }
             )
         }
     }
@@ -65,9 +115,11 @@ private fun NotesListScreen(
     notes: List<Note>,
     labels: List<String>,
     selectedLabel: String?,
+    notesDirectoryPath: String,
     onStartCreate: () -> Unit,
     onOpenNote: (Note) -> Unit,
-    onSelectLabel: (String?) -> Unit
+    onSelectLabel: (String?) -> Unit,
+    onOpenSettings: () -> Unit
 ) {
     val filteredNotes = selectedLabel?.let { label ->
         notes.filter { it.labels.contains(label) }
@@ -77,10 +129,29 @@ private fun NotesListScreen(
         modifier = Modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text(
-            text = "Twoje notatki",
-            style = MaterialTheme.typography.titleMedium
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Twoje notatki",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                if (notesDirectoryPath.isNotBlank()) {
+                    Text(
+                        text = notesDirectoryPath,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+            IconButton(onClick = onOpenSettings) {
+                Icon(
+                    imageVector = Icons.Filled.Settings,
+                    contentDescription = "Ustawienia katalogu"
+                )
+            }
+        }
         Button(onClick = onStartCreate) {
             Text("Nowa notatka")
         }

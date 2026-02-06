@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.notes.backup.EncryptedBackupManager
 import com.example.notes.data.Note
+import com.example.notes.data.NotesDirectoryProvider
 import com.example.notes.data.NotesRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -13,7 +14,8 @@ import java.io.File
 
 class NotesViewModel(
     private val repository: NotesRepository,
-    private val backupManager: EncryptedBackupManager
+    private val backupManager: EncryptedBackupManager,
+    private val notesDirectoryProvider: NotesDirectoryProvider
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(NotesUiState())
@@ -23,7 +25,11 @@ class NotesViewModel(
         viewModelScope.launch {
             val notes = repository.listNotes()
             val labels = repository.availableLabels()
-            _state.value = _state.value.copy(notes = notes, labels = labels)
+            _state.value = _state.value.copy(
+                notes = notes,
+                labels = labels,
+                notesDirectoryPath = notesDirectoryProvider.notesDirectory().absolutePath
+            )
         }
     }
 
@@ -80,6 +86,11 @@ class NotesViewModel(
             backupManager.createAndUploadBackup(password, outputDir)
         }
     }
+
+    fun updateNotesDirectory(path: String) {
+        notesDirectoryProvider.setNotesDirectory(path)
+        loadNotes()
+    }
 }
 
 data class NotesUiState(
@@ -87,5 +98,6 @@ data class NotesUiState(
     val labels: List<String> = emptyList(),
     val selectedNote: Note? = null,
     val selectedLabel: String? = null,
-    val isEditing: Boolean = false
+    val isEditing: Boolean = false,
+    val notesDirectoryPath: String = ""
 )

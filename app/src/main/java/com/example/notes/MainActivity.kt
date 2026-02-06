@@ -3,7 +3,6 @@ package com.example.notes
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.viewModels
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -16,18 +15,22 @@ import com.example.notes.ui.NotesScreen
 import com.example.notes.ui.NotesViewModel
 
 class MainActivity : ComponentActivity() {
-    private val viewModel: NotesViewModel by viewModels {
-        NotesViewModelFactory(
-            repository = FileNotesRepository(NotesDirectoryProvider(this)),
-            backupManager = EncryptedBackupManager(
-                notesDirectory = NotesDirectoryProvider(this).notesDirectory(),
-                backupStorage = GoogleDriveBackupStorage(PlaceholderDriveUploader())
-            )
-        )
-    }
+    private lateinit var viewModel: NotesViewModel
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val notesDirectoryProvider = NotesDirectoryProvider(this)
+        viewModel = ViewModelProvider(
+            this,
+            NotesViewModelFactory(
+                repository = FileNotesRepository(notesDirectoryProvider),
+                backupManager = EncryptedBackupManager(
+                    notesDirectoryProvider = notesDirectoryProvider,
+                    backupStorage = GoogleDriveBackupStorage(PlaceholderDriveUploader())
+                ),
+                notesDirectoryProvider = notesDirectoryProvider
+            )
+        )[NotesViewModel::class.java]
         viewModel.loadNotes()
         setContent {
             val state = viewModel.state.collectAsStateWithLifecycle().value
@@ -38,7 +41,8 @@ class MainActivity : ComponentActivity() {
                 onSaveNote = viewModel::saveNote,
                 onDeleteNote = viewModel::deleteSelectedNote,
                 onSelectLabel = viewModel::selectLabel,
-                onCloseEditor = viewModel::closeEditor
+                onCloseEditor = viewModel::closeEditor,
+                onUpdateNotesDirectory = viewModel::updateNotesDirectory
             )
         }
     }
@@ -46,12 +50,13 @@ class MainActivity : ComponentActivity() {
 
 private class NotesViewModelFactory(
     private val repository: FileNotesRepository,
-    private val backupManager: EncryptedBackupManager
+    private val backupManager: EncryptedBackupManager,
+    private val notesDirectoryProvider: NotesDirectoryProvider
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(NotesViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return NotesViewModel(repository, backupManager) as T
+            return NotesViewModel(repository, backupManager, notesDirectoryProvider) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }
