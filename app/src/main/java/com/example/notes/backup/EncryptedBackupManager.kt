@@ -1,5 +1,6 @@
 package com.example.notes.backup
 
+import com.example.notes.data.NotesDirectoryProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -16,7 +17,7 @@ import javax.crypto.spec.SecretKeySpec
 import kotlin.random.Random
 
 class EncryptedBackupManager(
-    private val notesDirectory: File,
+    private val notesDirectoryProvider: NotesDirectoryProvider,
     private val backupStorage: BackupStorage
 ) {
     suspend fun createAndUploadBackup(password: CharArray, outputDir: File) {
@@ -31,6 +32,7 @@ class EncryptedBackupManager(
     }
 
     private fun createZip(target: File) {
+        val notesDirectory = notesDirectoryProvider.notesDirectory()
         ZipOutputStream(FileOutputStream(target)).use { zipOut ->
             notesDirectory.listFiles()?.forEach { file ->
                 if (file.isFile && file.extension == "txt" || file.name == "notes_index.json") {
