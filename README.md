@@ -1,13 +1,14 @@
 # Notes (Android MVP)
 
 Minimalna aplikacja Android do tworzenia i przeglądania notatek w plikach `.txt`.
-Notatki są grupowane labelami, a metadane są przechowywane w `notes_index.json`
+Notatki są grupowane labelami (opcjonalnymi), a metadane są przechowywane w `notes_index.json`
 obok plików tekstowych.
 
 ## Założenia MVP
 - Notatki są przechowywane jako zwykłe pliki `.txt`.
 - Aplikacja zarządza katalogiem `notes` w `getExternalFilesDir`.
 - Labele są przechowywane w indeksie JSON.
+- Lista notatek pozwala filtrować po labelach, a edycja odbywa się w osobnym ekranie.
 - Backup tworzy zaszyfrowany plik `.enc` (AES-GCM) i przekazuje go do warstwy storage.
 
 ## Backup Google Drive

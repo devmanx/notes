@@ -27,8 +27,26 @@ class NotesViewModel(
         }
     }
 
-    fun selectNote(note: Note?) {
-        _state.value = _state.value.copy(selectedNote = note)
+    fun startCreateNote() {
+        _state.value = _state.value.copy(
+            selectedNote = null,
+            isEditing = true
+        )
+    }
+
+    fun openNote(note: Note) {
+        _state.value = _state.value.copy(
+            selectedNote = note,
+            isEditing = true
+        )
+    }
+
+    fun closeEditor() {
+        _state.value = _state.value.copy(isEditing = false)
+    }
+
+    fun selectLabel(label: String?) {
+        _state.value = _state.value.copy(selectedLabel = label)
     }
 
     fun saveNote(title: String, content: String, labels: List<String>) {
@@ -44,7 +62,7 @@ class NotesViewModel(
                 )
             )
             loadNotes()
-            selectNote(saved)
+            _state.value = _state.value.copy(selectedNote = saved, isEditing = false)
         }
     }
 
@@ -53,7 +71,7 @@ class NotesViewModel(
         viewModelScope.launch {
             repository.deleteNote(id)
             loadNotes()
-            selectNote(null)
+            _state.value = _state.value.copy(selectedNote = null, isEditing = false)
         }
     }
 
@@ -67,5 +85,7 @@ class NotesViewModel(
 data class NotesUiState(
     val notes: List<Note> = emptyList(),
     val labels: List<String> = emptyList(),
-    val selectedNote: Note? = null
+    val selectedNote: Note? = null,
+    val selectedLabel: String? = null,
+    val isEditing: Boolean = false
 )
