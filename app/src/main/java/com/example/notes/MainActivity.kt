@@ -3,7 +3,6 @@ package com.example.notes
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.viewModels
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -16,20 +15,22 @@ import com.example.notes.ui.NotesScreen
 import com.example.notes.ui.NotesViewModel
 
 class MainActivity : ComponentActivity() {
-    private val notesDirectoryProvider = NotesDirectoryProvider(this)
-    private val viewModel: NotesViewModel by viewModels {
-        NotesViewModelFactory(
-            repository = FileNotesRepository(notesDirectoryProvider),
-            backupManager = EncryptedBackupManager(
-                notesDirectoryProvider = notesDirectoryProvider,
-                backupStorage = GoogleDriveBackupStorage(PlaceholderDriveUploader())
-            ),
-            notesDirectoryProvider = notesDirectoryProvider
-        )
-    }
+    private lateinit var viewModel: NotesViewModel
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val notesDirectoryProvider = NotesDirectoryProvider(this)
+        viewModel = ViewModelProvider(
+            this,
+            NotesViewModelFactory(
+                repository = FileNotesRepository(notesDirectoryProvider),
+                backupManager = EncryptedBackupManager(
+                    notesDirectoryProvider = notesDirectoryProvider,
+                    backupStorage = GoogleDriveBackupStorage(PlaceholderDriveUploader())
+                ),
+                notesDirectoryProvider = notesDirectoryProvider
+            )
+        )[NotesViewModel::class.java]
         viewModel.loadNotes()
         setContent {
             val state = viewModel.state.collectAsStateWithLifecycle().value
