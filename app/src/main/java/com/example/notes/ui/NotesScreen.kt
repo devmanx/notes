@@ -9,9 +9,11 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -36,9 +38,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.platform.LocalContext
 import com.example.notes.data.Note
 
@@ -416,6 +418,7 @@ private fun NoteEditorScreen(
     var title by remember(note?.id) { mutableStateOf(note?.title.orEmpty()) }
     var content by remember(note?.id) { mutableStateOf(note?.content.orEmpty()) }
     var labels by remember(note?.id) { mutableStateOf(note?.labels?.joinToString(", ").orEmpty()) }
+    var isDeleteDialogOpen by remember(note?.id) { mutableStateOf(false) }
 
     LaunchedEffect(note?.id) {
         title = note?.title.orEmpty()
@@ -449,11 +452,8 @@ private fun NoteEditorScreen(
             modifier = Modifier.fillMaxWidth().weight(1f),
             label = { Text("Treść") }
         )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Spacer(modifier = Modifier.height(12.dp))
+        NoteActionFooter {
             Button(onClick = {
                 val parsedLabels = labels.split(",")
                     .map { it.trim() }
@@ -463,7 +463,7 @@ private fun NoteEditorScreen(
                 Text("Zapisz")
             }
             if (note != null) {
-                Button(onClick = onDeleteNote) {
+                Button(onClick = { isDeleteDialogOpen = true }) {
                     Text("Usuń")
                 }
             }
@@ -472,6 +472,27 @@ private fun NoteEditorScreen(
                 Text("Wróć")
             }
         }
+    }
+
+    if (isDeleteDialogOpen) {
+        AlertDialog(
+            onDismissRequest = { isDeleteDialogOpen = false },
+            title = { Text("Potwierdź usunięcie") },
+            text = { Text("Czy na pewno chcesz usunąć tę notatkę?") },
+            confirmButton = {
+                Button(onClick = {
+                    isDeleteDialogOpen = false
+                    onDeleteNote()
+                }) {
+                    Text("Usuń")
+                }
+            },
+            dismissButton = {
+                Button(onClick = { isDeleteDialogOpen = false }) {
+                    Text("Anuluj")
+                }
+            }
+        )
     }
 }
 
@@ -482,6 +503,8 @@ private fun NotePreviewScreen(
     onDeleteNote: () -> Unit,
     onCloseViewer: () -> Unit
 ) {
+    var isDeleteDialogOpen by remember(note?.id) { mutableStateOf(false) }
+
     Column(
         modifier = Modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -500,16 +523,13 @@ private fun NotePreviewScreen(
             text = note?.content.orEmpty(),
             style = MaterialTheme.typography.bodyMedium
         )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Spacer(modifier = Modifier.weight(1f))
+        NoteActionFooter {
             Button(onClick = onStartEdit) {
                 Text("Edytuj")
             }
             if (note != null) {
-                Button(onClick = onDeleteNote) {
+                Button(onClick = { isDeleteDialogOpen = true }) {
                     Text("Usuń")
                 }
             }
@@ -518,6 +538,42 @@ private fun NotePreviewScreen(
                 Text("Wróć")
             }
         }
+    }
+
+    if (isDeleteDialogOpen) {
+        AlertDialog(
+            onDismissRequest = { isDeleteDialogOpen = false },
+            title = { Text("Potwierdź usunięcie") },
+            text = { Text("Czy na pewno chcesz usunąć tę notatkę?") },
+            confirmButton = {
+                Button(onClick = {
+                    isDeleteDialogOpen = false
+                    onDeleteNote()
+                }) {
+                    Text("Usuń")
+                }
+            },
+            dismissButton = {
+                Button(onClick = { isDeleteDialogOpen = false }) {
+                    Text("Anuluj")
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun NoteActionFooter(content: @Composable RowScope.() -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        tonalElevation = 2.dp
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            content = content
+        )
     }
 }
 
