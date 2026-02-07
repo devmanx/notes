@@ -13,10 +13,12 @@ class NotesDirectoryProvider(private val context: Context) {
             return defaultDir
         }
         val customDir = File(storedPath)
-        if (!customDir.exists()) {
-            customDir.mkdirs()
+        return if (isWritableDirectory(customDir)) {
+            customDir
+        } else {
+            preferences.edit().remove(KEY_NOTES_DIR).apply()
+            defaultDir
         }
-        return if (customDir.exists()) customDir else defaultDir
     }
 
     fun setNotesDirectory(path: String?) {
@@ -25,10 +27,28 @@ class NotesDirectoryProvider(private val context: Context) {
             return
         }
         val target = File(path)
-        if (!target.exists()) {
-            target.mkdirs()
+        if (isWritableDirectory(target)) {
+            preferences.edit().putString(KEY_NOTES_DIR, target.absolutePath).apply()
+        } else {
+            preferences.edit().remove(KEY_NOTES_DIR).apply()
         }
-        preferences.edit().putString(KEY_NOTES_DIR, target.absolutePath).apply()
+    }
+
+    private fun isWritableDirectory(directory: File): Boolean {
+        if (!directory.exists()) {
+            directory.mkdirs()
+        }
+        if (!directory.exists() || !directory.isDirectory) {
+            return false
+        }
+        return try {
+            val probe = File(directory, ".notes_write_test")
+            probe.writeText("probe")
+            probe.delete()
+            true
+        } catch (exception: Exception) {
+            false
+        }
     }
 
     private companion object {
