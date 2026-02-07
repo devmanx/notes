@@ -1,5 +1,11 @@
 package com.example.notes.ui
 
+import android.content.Intent
+import android.net.Uri
+import android.os.Environment
+import android.provider.DocumentsContract
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -32,6 +38,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.platform.LocalContext
 import com.example.notes.data.Note
 
 @Composable
@@ -39,15 +47,47 @@ fun NotesScreen(
     state: NotesUiState,
     onStartCreate: () -> Unit,
     onOpenNote: (Note) -> Unit,
+    onStartEdit: () -> Unit,
     onSaveNote: (String, String, List<String>) -> Unit,
     onDeleteNote: () -> Unit,
     onSelectLabel: (String?) -> Unit,
     onCloseEditor: () -> Unit,
-    onUpdateNotesDirectory: (String) -> Unit
+    onCloseViewer: () -> Unit,
+    onUpdateNotesDirectory: (String) -> Unit,
+    onExportZip: () -> Unit,
+    onImportZip: (Uri) -> Unit,
+    onExportGoogleDrive: (CharArray) -> Unit,
+    onImportGoogleDrive: () -> Unit
 ) {
     var isSettingsOpen by remember { mutableStateOf(false) }
+    var isDirectoryDialogOpen by remember { mutableStateOf(false) }
+    var isExportDialogOpen by remember { mutableStateOf(false) }
+    var isImportDialogOpen by remember { mutableStateOf(false) }
+    var isDriveExportDialogOpen by remember { mutableStateOf(false) }
+    var isDriveImportDialogOpen by remember { mutableStateOf(false) }
+    var drivePassword by remember { mutableStateOf("") }
     var directoryInput by remember(state.notesDirectoryPath) {
         mutableStateOf(state.notesDirectoryPath)
+    }
+    val context = LocalContext.current
+    val directoryPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        if (uri != null) {
+            val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            context.contentResolver.takePersistableUriPermission(uri, flags)
+            val resolvedPath = resolveDirectoryPath(uri)
+            if (resolvedPath != null) {
+                directoryInput = resolvedPath
+            }
+        }
+    }
+    val zipImportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            onImportZip(uri)
+        }
     }
 
     LaunchedEffect(state.notesDirectoryPath) {
@@ -63,6 +103,13 @@ fun NotesScreen(
                 onSaveNote = onSaveNote,
                 onDeleteNote = onDeleteNote,
                 onCloseEditor = onCloseEditor
+            )
+        } else if (state.isViewing) {
+            NotePreviewScreen(
+                note = state.selectedNote,
+                onStartEdit = onStartEdit,
+                onDeleteNote = onDeleteNote,
+                onCloseViewer = onCloseViewer
             )
         } else {
             NotesListScreen(
@@ -80,7 +127,46 @@ fun NotesScreen(
         if (isSettingsOpen) {
             AlertDialog(
                 onDismissRequest = { isSettingsOpen = false },
-                title = { Text("Ustawienia katalogu") },
+                title = { Text("Ustawienia") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = {
+                            isSettingsOpen = false
+                            isDirectoryDialogOpen = true
+                        }) {
+                            Text("Katalog notatek")
+                        }
+                        Button(onClick = {
+                            isSettingsOpen = false
+                            isExportDialogOpen = true
+                        }) {
+                            Text("Eksport notatek")
+                        }
+                        Button(onClick = {
+                            isSettingsOpen = false
+                            isImportDialogOpen = true
+                        }) {
+                            Text("Import notatek")
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(onClick = { isSettingsOpen = false }) {
+                        Text("Zamknij")
+                    }
+                },
+                dismissButton = {
+                    Button(onClick = { isSettingsOpen = false }) {
+                        Text("Anuluj")
+                    }
+                }
+            )
+        }
+
+        if (isDirectoryDialogOpen) {
+            AlertDialog(
+                onDismissRequest = { isDirectoryDialogOpen = false },
+                title = { Text("Katalog notatek") },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("Wskaż katalog na notatki:")
@@ -90,18 +176,134 @@ fun NotesScreen(
                             modifier = Modifier.fillMaxWidth(),
                             label = { Text("Ścieżka do katalogu") }
                         )
+                        Button(onClick = { directoryPickerLauncher.launch(null) }) {
+                            Text("Wybierz katalog")
+                        }
                     }
                 },
                 confirmButton = {
                     Button(onClick = {
                         onUpdateNotesDirectory(directoryInput.trim())
-                        isSettingsOpen = false
+                        isDirectoryDialogOpen = false
                     }) {
                         Text("Zapisz")
                     }
                 },
                 dismissButton = {
-                    Button(onClick = { isSettingsOpen = false }) {
+                    Button(onClick = { isDirectoryDialogOpen = false }) {
+                        Text("Anuluj")
+                    }
+                }
+            )
+        }
+
+        if (isExportDialogOpen) {
+            AlertDialog(
+                onDismissRequest = { isExportDialogOpen = false },
+                title = { Text("Eksport notatek") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = {
+                            isExportDialogOpen = false
+                            isDriveExportDialogOpen = true
+                        }) {
+                            Text("Dysk Google")
+                        }
+                        Button(onClick = {
+                            onExportZip()
+                            isExportDialogOpen = false
+                        }) {
+                            Text("Plik ZIP")
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(onClick = { isExportDialogOpen = false }) {
+                        Text("Zamknij")
+                    }
+                }
+            )
+        }
+
+        if (isImportDialogOpen) {
+            AlertDialog(
+                onDismissRequest = { isImportDialogOpen = false },
+                title = { Text("Import notatek") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = {
+                            isImportDialogOpen = false
+                            isDriveImportDialogOpen = true
+                        }) {
+                            Text("Dysk Google")
+                        }
+                        Button(onClick = {
+                            zipImportLauncher.launch(arrayOf("application/zip"))
+                            isImportDialogOpen = false
+                        }) {
+                            Text("Plik ZIP")
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(onClick = { isImportDialogOpen = false }) {
+                        Text("Zamknij")
+                    }
+                }
+            )
+        }
+
+        if (isDriveExportDialogOpen) {
+            AlertDialog(
+                onDismissRequest = { isDriveExportDialogOpen = false },
+                title = { Text("Eksport na Dysk Google") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Podaj hasło do zabezpieczenia kopii:")
+                        OutlinedTextField(
+                            value = drivePassword,
+                            onValueChange = { drivePassword = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("Hasło") },
+                            visualTransformation = PasswordVisualTransformation()
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(onClick = {
+                        onExportGoogleDrive(drivePassword.toCharArray())
+                        drivePassword = ""
+                        isDriveExportDialogOpen = false
+                    }) {
+                        Text("Eksportuj")
+                    }
+                },
+                dismissButton = {
+                    Button(onClick = {
+                        drivePassword = ""
+                        isDriveExportDialogOpen = false
+                    }) {
+                        Text("Anuluj")
+                    }
+                }
+            )
+        }
+
+        if (isDriveImportDialogOpen) {
+            AlertDialog(
+                onDismissRequest = { isDriveImportDialogOpen = false },
+                title = { Text("Import z Dysku Google") },
+                text = { Text("Autoryzuj dostęp do Dysku Google, aby importować notatki.") },
+                confirmButton = {
+                    Button(onClick = {
+                        onImportGoogleDrive()
+                        isDriveImportDialogOpen = false
+                    }) {
+                        Text("Autoryzuj")
+                    }
+                },
+                dismissButton = {
+                    Button(onClick = { isDriveImportDialogOpen = false }) {
                         Text("Anuluj")
                     }
                 }
@@ -148,7 +350,7 @@ private fun NotesListScreen(
             IconButton(onClick = onOpenSettings) {
                 Icon(
                     imageVector = Icons.Filled.Settings,
-                    contentDescription = "Ustawienia katalogu"
+                    contentDescription = "Ustawienia"
                 )
             }
         }
@@ -271,4 +473,64 @@ private fun NoteEditorScreen(
             }
         }
     }
+}
+
+@Composable
+private fun NotePreviewScreen(
+    note: Note?,
+    onStartEdit: () -> Unit,
+    onDeleteNote: () -> Unit,
+    onCloseViewer: () -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text(
+            text = note?.title?.ifBlank { "(bez tytułu)" } ?: "(bez tytułu)",
+            style = MaterialTheme.typography.titleMedium
+        )
+        if (!note?.labels.isNullOrEmpty()) {
+            Text(
+                text = note?.labels?.joinToString(prefix = "#").orEmpty(),
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+        Text(
+            text = note?.content.orEmpty(),
+            style = MaterialTheme.typography.bodyMedium
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Button(onClick = onStartEdit) {
+                Text("Edytuj")
+            }
+            if (note != null) {
+                Button(onClick = onDeleteNote) {
+                    Text("Usuń")
+                }
+            }
+            Spacer(modifier = Modifier.weight(1f))
+            Button(onClick = onCloseViewer) {
+                Text("Wróć")
+            }
+        }
+    }
+}
+
+private fun resolveDirectoryPath(uri: Uri): String? {
+    val docId = DocumentsContract.getTreeDocumentId(uri)
+    if (docId.startsWith("primary:")) {
+        val relativePath = docId.removePrefix("primary:").trimStart('/')
+        val basePath = Environment.getExternalStorageDirectory().absolutePath
+        return if (relativePath.isBlank()) {
+            basePath
+        } else {
+            "$basePath/$relativePath"
+        }
+    }
+    return null
 }

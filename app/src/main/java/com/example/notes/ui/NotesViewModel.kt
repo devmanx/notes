@@ -1,16 +1,22 @@
 package com.example.notes.ui
 
+import android.content.ContentResolver
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.notes.backup.EncryptedBackupManager
 import com.example.notes.data.Note
 import com.example.notes.data.NotesDirectoryProvider
 import com.example.notes.data.NotesRepository
+import java.io.File
+import java.io.FileOutputStream
+import java.util.zip.ZipInputStream
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import java.io.File
+import kotlinx.coroutines.withContext
 
 class NotesViewModel(
     private val repository: NotesRepository,
@@ -36,19 +42,30 @@ class NotesViewModel(
     fun startCreateNote() {
         _state.value = _state.value.copy(
             selectedNote = null,
-            isEditing = true
+            isEditing = true,
+            isViewing = false
         )
     }
 
     fun openNote(note: Note) {
         _state.value = _state.value.copy(
             selectedNote = note,
-            isEditing = true
+            isEditing = false,
+            isViewing = true
         )
     }
 
     fun closeEditor() {
-        _state.value = _state.value.copy(isEditing = false)
+        _state.value = _state.value.copy(isEditing = false, isViewing = false)
+    }
+
+    fun closeViewer() {
+        _state.value = _state.value.copy(isViewing = false)
+    }
+
+    fun startEditNote() {
+        if (_state.value.selectedNote == null) return
+        _state.value = _state.value.copy(isEditing = true, isViewing = false)
     }
 
     fun selectLabel(label: String?) {
@@ -68,7 +85,7 @@ class NotesViewModel(
                 )
             )
             loadNotes()
-            _state.value = _state.value.copy(selectedNote = saved, isEditing = false)
+            _state.value = _state.value.copy(selectedNote = saved, isEditing = false, isViewing = true)
         }
     }
 
@@ -77,7 +94,7 @@ class NotesViewModel(
         viewModelScope.launch {
             repository.deleteNote(id)
             loadNotes()
-            _state.value = _state.value.copy(selectedNote = null, isEditing = false)
+            _state.value = _state.value.copy(selectedNote = null, isEditing = false, isViewing = false)
         }
     }
 
@@ -85,6 +102,48 @@ class NotesViewModel(
         viewModelScope.launch {
             backupManager.createAndUploadBackup(password, outputDir)
         }
+    }
+
+    fun exportNotesToZip() {
+        viewModelScope.launch {
+            val outputDir = notesDirectoryProvider.notesDirectory()
+            backupManager.createZipBackup(outputDir)
+        }
+    }
+
+    fun exportNotesToGoogleDrive(password: CharArray, outputDir: File) {
+        viewModelScope.launch {
+            backupManager.createAndUploadBackup(password, outputDir)
+        }
+    }
+
+    fun importNotesFromZip(contentResolver: ContentResolver, uri: Uri) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                val notesDir = notesDirectoryProvider.notesDirectory()
+                contentResolver.openInputStream(uri)?.use { inputStream ->
+                    ZipInputStream(inputStream).use { zipStream ->
+                        var entry = zipStream.nextEntry
+                        while (entry != null) {
+                            val sanitizedName = File(entry.name).name
+                            if (!entry.isDirectory && (sanitizedName.endsWith(".txt") || sanitizedName == "notes_index.json")) {
+                                val outFile = File(notesDir, sanitizedName)
+                                FileOutputStream(outFile).use { output ->
+                                    zipStream.copyTo(output)
+                                }
+                            }
+                            zipStream.closeEntry()
+                            entry = zipStream.nextEntry
+                        }
+                    }
+                }
+            }
+            loadNotes()
+        }
+    }
+
+    fun updateDriveAuthorization(authorized: Boolean) {
+        _state.value = _state.value.copy(isDriveAuthorized = authorized)
     }
 
     fun updateNotesDirectory(path: String) {
@@ -99,5 +158,7 @@ data class NotesUiState(
     val selectedNote: Note? = null,
     val selectedLabel: String? = null,
     val isEditing: Boolean = false,
-    val notesDirectoryPath: String = ""
+    val isViewing: Boolean = false,
+    val notesDirectoryPath: String = "",
+    val isDriveAuthorized: Boolean = false
 )
