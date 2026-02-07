@@ -7,6 +7,7 @@ import android.provider.DocumentsContract
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -16,6 +17,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -38,6 +42,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -435,6 +442,11 @@ private fun NoteEditorScreen(
     var content by remember(note?.id) { mutableStateOf(note?.content.orEmpty()) }
     var labels by remember(note?.id) { mutableStateOf(note?.labels?.joinToString(", ").orEmpty()) }
     var isDeleteDialogOpen by remember(note?.id) { mutableStateOf(false) }
+    var isCancelDialogOpen by remember(note?.id) { mutableStateOf(false) }
+    val edgeThresholdPx = with(LocalDensity.current) { 32.dp.toPx() }
+    val swipeTriggerDistancePx = with(LocalDensity.current) { 96.dp.toPx() }
+    var dragDistance by remember { mutableStateOf(0f) }
+    var startNearEdge by remember { mutableStateOf(false) }
 
     LaunchedEffect(note?.id) {
         title = note?.title.orEmpty()
@@ -442,10 +454,38 @@ private fun NoteEditorScreen(
         labels = note?.labels?.joinToString(", ").orEmpty()
     }
 
-    Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val down = awaitPointerEvent().changes.firstOrNull() ?: continue
+                        startNearEdge = down.position.x >= size.width - edgeThresholdPx
+                        dragDistance = 0f
+                        val pointerId = down.id
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull { it.id == pointerId } ?: break
+                            if (!change.pressed) break
+                            if (startNearEdge) {
+                                dragDistance += change.position.x - change.previousPosition.x
+                                if (dragDistance <= -swipeTriggerDistancePx) {
+                                    isCancelDialogOpen = true
+                                    startNearEdge = false
+                                    break
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(16.dp)
     ) {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
         Text(
             text = note?.let { "Edytuj notatkę" } ?: "Nowa notatka",
             style = MaterialTheme.typography.titleMedium
@@ -488,6 +528,7 @@ private fun NoteEditorScreen(
                 Text("Wróć")
             }
         }
+        }
     }
 
     if (isDeleteDialogOpen) {
@@ -510,6 +551,27 @@ private fun NoteEditorScreen(
             }
         )
     }
+
+    if (isCancelDialogOpen) {
+        AlertDialog(
+            onDismissRequest = { isCancelDialogOpen = false },
+            title = { Text("Anulować edycję?") },
+            text = { Text("Wszystkie niezapisane zmiany zostaną utracone.") },
+            confirmButton = {
+                Button(onClick = {
+                    isCancelDialogOpen = false
+                    onCloseEditor()
+                }) {
+                    Text("Anuluj")
+                }
+            },
+            dismissButton = {
+                Button(onClick = { isCancelDialogOpen = false }) {
+                    Text("Pozostań")
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -520,38 +582,82 @@ private fun NotePreviewScreen(
     onCloseViewer: () -> Unit
 ) {
     var isDeleteDialogOpen by remember(note?.id) { mutableStateOf(false) }
+    val edgeThresholdPx = with(LocalDensity.current) { 32.dp.toPx() }
+    val swipeTriggerDistancePx = with(LocalDensity.current) { 96.dp.toPx() }
+    var dragDistance by remember { mutableStateOf(0f) }
+    var startNearEdge by remember { mutableStateOf(false) }
 
-    Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Text(
-            text = note?.title?.ifBlank { "(bez tytułu)" } ?: "(bez tytułu)",
-            style = MaterialTheme.typography.titleMedium
-        )
-        if (!note?.labels.isNullOrEmpty()) {
-            Text(
-                text = note?.labels?.joinToString(prefix = "#").orEmpty(),
-                style = MaterialTheme.typography.bodySmall
-            )
-        }
-        Text(
-            text = note?.content.orEmpty(),
-            style = MaterialTheme.typography.bodyMedium
-        )
-        Spacer(modifier = Modifier.weight(1f))
-        NoteActionFooter {
-            Button(onClick = onStartEdit) {
-                Text("Edytuj")
-            }
-            if (note != null) {
-                Button(onClick = { isDeleteDialogOpen = true }) {
-                    Text("Usuń")
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val down = awaitPointerEvent().changes.firstOrNull() ?: continue
+                        startNearEdge = down.position.x >= size.width - edgeThresholdPx
+                        dragDistance = 0f
+                        val pointerId = down.id
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull { it.id == pointerId } ?: break
+                            if (!change.pressed) break
+                            if (startNearEdge) {
+                                dragDistance += change.position.x - change.previousPosition.x
+                                if (dragDistance <= -swipeTriggerDistancePx) {
+                                    onCloseViewer()
+                                    startNearEdge = false
+                                    break
+                                }
+                            }
+                        }
+                    }
                 }
             }
-            Spacer(modifier = Modifier.weight(1f))
-            Button(onClick = onCloseViewer) {
-                Text("Wróć")
+            .padding(16.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = note?.title?.ifBlank { "(bez tytułu)" } ?: "(bez tytułu)",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                if (!note?.labels.isNullOrEmpty()) {
+                    Text(
+                        text = note?.labels?.joinToString(prefix = "#").orEmpty(),
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                SelectionContainer {
+                    Text(
+                        text = note?.content.orEmpty(),
+                        modifier = Modifier.fillMaxWidth(),
+                        style = MaterialTheme.typography.bodyMedium,
+                        lineBreak = LineBreak.Paragraph,
+                        softWrap = true
+                    )
+                }
+            }
+            NoteActionFooter {
+                Button(onClick = onStartEdit) {
+                    Text("Edytuj")
+                }
+                if (note != null) {
+                    Button(onClick = { isDeleteDialogOpen = true }) {
+                        Text("Usuń")
+                    }
+                }
+                Spacer(modifier = Modifier.weight(1f))
+                Button(onClick = onCloseViewer) {
+                    Text("Wróć")
+                }
             }
         }
     }
