@@ -28,6 +28,15 @@ class EncryptedBackupManager(
             encrypt(zipFile, encryptedFile, password)
             backupStorage.uploadBackup(encryptedFile)
             zipFile.delete()
+            encryptedFile.delete()
+        }
+    }
+
+    suspend fun createZipBackup(outputDir: File): File {
+        return withContext(Dispatchers.IO) {
+            val zipFile = File(outputDir, "notes_export_${System.currentTimeMillis()}.zip")
+            createZip(zipFile)
+            zipFile
         }
     }
 
