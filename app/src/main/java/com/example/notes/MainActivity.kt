@@ -80,6 +80,7 @@ class MainActivity : ComponentActivity() {
                 onUpdateNotesDirectory = viewModel::updateNotesDirectory,
                 onExportZip = viewModel::exportNotesToZip,
                 onImportZip = { uri -> viewModel.importNotesFromZip(contentResolver, uri) },
+                onImportDirectory = { uri -> viewModel.importNotesFromDirectory(applicationContext, uri) },
                 onExportGoogleDrive = { password ->
                     ensureDriveAuthorized {
                         viewModel.exportNotesToGoogleDrive(password, cacheDir)

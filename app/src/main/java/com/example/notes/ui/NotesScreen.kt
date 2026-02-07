@@ -58,6 +58,7 @@ fun NotesScreen(
     onUpdateNotesDirectory: (String) -> Unit,
     onExportZip: () -> Unit,
     onImportZip: (Uri) -> Unit,
+    onImportDirectory: (Uri) -> Unit,
     onExportGoogleDrive: (CharArray) -> Unit,
     onImportGoogleDrive: () -> Unit
 ) {
@@ -89,6 +90,15 @@ fun NotesScreen(
     ) { uri ->
         if (uri != null) {
             onImportZip(uri)
+        }
+    }
+    val directoryImportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        if (uri != null) {
+            val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
+            context.contentResolver.takePersistableUriPermission(uri, flags)
+            onImportDirectory(uri)
         }
     }
 
@@ -245,6 +255,15 @@ fun NotesScreen(
                         }) {
                             Text("Plik ZIP")
                         }
+                        Button(onClick = {
+                            directoryImportLauncher.launch(null)
+                            isImportDialogOpen = false
+                        }) {
+                            Text("Katalog TXT")
+                        }
+                        Text(
+                            text = "Pliki .txt zostaną wczytane jako notatki, a nazwa pliku stanie się tytułem."
+                        )
                     }
                 },
                 confirmButton = {

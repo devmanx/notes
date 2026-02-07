@@ -1,9 +1,11 @@
 package com.example.notes.ui
 
 import android.content.ContentResolver
+import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.documentfile.provider.DocumentFile
 import com.example.notes.backup.EncryptedBackupManager
 import com.example.notes.data.Note
 import com.example.notes.data.NotesDirectoryProvider
@@ -137,6 +139,36 @@ class NotesViewModel(
                         }
                     }
                 }
+            }
+            loadNotes()
+        }
+    }
+
+    fun importNotesFromDirectory(context: Context, uri: Uri) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                val directory = DocumentFile.fromTreeUri(context, uri) ?: return@withContext
+                val resolver = context.contentResolver
+                directory.listFiles()
+                    .filter { it.isFile }
+                    .forEach { file ->
+                        val displayName = file.name ?: return@forEach
+                        if (!displayName.lowercase().endsWith(".txt")) return@forEach
+                        val title = displayName.substringBeforeLast(".")
+                        val content = resolver.openInputStream(file.uri)
+                            ?.bufferedReader()
+                            ?.use { it.readText() }
+                            ?: return@forEach
+                        repository.saveNote(
+                            Note(
+                                id = "",
+                                title = title,
+                                content = content,
+                                labels = emptyList(),
+                                lastModifiedEpochMs = System.currentTimeMillis()
+                            )
+                        )
+                    }
             }
             loadNotes()
         }
