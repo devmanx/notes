@@ -469,7 +469,7 @@ private fun NoteEditorScreen(
                             val change = event.changes.firstOrNull { it.id == pointerId } ?: break
                             if (!change.pressed) break
                             if (startNearEdge) {
-                                dragDistance += change.positionChange().x
+                                dragDistance += change.position.x - change.previousPosition.x
                                 if (dragDistance <= -swipeTriggerDistancePx) {
                                     isCancelDialogOpen = true
                                     startNearEdge = false
@@ -602,7 +602,7 @@ private fun NotePreviewScreen(
                             val change = event.changes.firstOrNull { it.id == pointerId } ?: break
                             if (!change.pressed) break
                             if (startNearEdge) {
-                                dragDistance += change.positionChange().x
+                                dragDistance += change.position.x - change.previousPosition.x
                                 if (dragDistance <= -swipeTriggerDistancePx) {
                                     onCloseViewer()
                                     startNearEdge = false
