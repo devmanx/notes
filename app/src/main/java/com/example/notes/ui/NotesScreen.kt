@@ -369,15 +369,9 @@ private fun NotesListScreen(
                 Card(onClick = { onOpenNote(note) }) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Text(note.title.ifBlank { "(bez tytułu)" })
-                        if (note.labels.isNotEmpty()) {
-                            Text(
-                                text = note.labels.joinToString(prefix = "#"),
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
                         Text(
                             text = note.content,
-                            maxLines = 2,
+                            maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             style = MaterialTheme.typography.bodySmall
                         )
@@ -394,7 +388,10 @@ private fun LabelsRow(
     selectedLabel: String?,
     onSelectLabel: (String?) -> Unit
 ) {
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    LazyRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
         item {
             Button(onClick = { onSelectLabel(null) }) {
                 Text(if (selectedLabel == null) "Wszystkie" else "Wszystkie")
