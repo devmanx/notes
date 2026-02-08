@@ -351,9 +351,18 @@ private fun NotesListScreen(
     onSelectLabel: (String?) -> Unit,
     onOpenSettings: () -> Unit
 ) {
+    var searchQuery by remember { mutableStateOf("") }
     val filteredNotes = selectedLabel?.let { label ->
         notes.filter { it.labels.contains(label) }
     } ?: notes
+    val searchFilteredNotes = if (searchQuery.isBlank()) {
+        filteredNotes
+    } else {
+        val query = searchQuery.trim().lowercase()
+        filteredNotes.filter { note ->
+            note.title.lowercase().contains(query) || note.content.lowercase().contains(query)
+        }
+    }
 
     Column(
         modifier = Modifier.fillMaxSize().padding(16.dp),
@@ -385,13 +394,19 @@ private fun NotesListScreen(
         Button(onClick = onStartCreate) {
             Text("Nowa notatka")
         }
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = { searchQuery = it },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Szukaj notatek") }
+        )
         LabelsRow(
             labels = labels,
             selectedLabel = selectedLabel,
             onSelectLabel = onSelectLabel
         )
         LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(filteredNotes) { note ->
+            items(searchFilteredNotes) { note ->
                 Card(onClick = { onOpenNote(note) }) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Text(note.title.ifBlank { "(bez tytułu)" })
