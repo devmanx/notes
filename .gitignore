@@ -2,5 +2,4 @@
 /.idea/
 /app/build/
 build/
-/gradlew
 /java_pid19937.hprof
