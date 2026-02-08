@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Environment
 import android.provider.DocumentsContract
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -454,6 +455,10 @@ private fun NoteEditorScreen(
         labels = note?.labels?.joinToString(", ").orEmpty()
     }
 
+    BackHandler(enabled = !isCancelDialogOpen) {
+        isCancelDialogOpen = true
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -586,6 +591,10 @@ private fun NotePreviewScreen(
     val swipeTriggerDistancePx = with(LocalDensity.current) { 96.dp.toPx() }
     var dragDistance by remember { mutableStateOf(0f) }
     var startNearEdge by remember { mutableStateOf(false) }
+
+    BackHandler {
+        onCloseViewer()
+    }
 
     Box(
         modifier = Modifier
